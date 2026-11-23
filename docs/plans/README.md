@@ -1,0 +1,1 @@
+Plans 0001, 0002, 0004–0006, 0008–0011 built the current tool; their text lives in the original private history. 0003 (runner and measurement windows) and 0007 (Telegram bot) are kept as examples of how plans are written. New plans continue from 0012.

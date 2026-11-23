@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""Fake omp-run for the swarm tests: commits one file and prints a report."""
+
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+def _value(argv, flag):
+    if flag in argv:
+        index = argv.index(flag)
+        if index + 1 < len(argv):
+            return argv[index + 1]
+    return None
+
+
+def main():
+    argv = sys.argv[1:]
+    cwd = Path(_value(argv, "--cwd") or os.getcwd())
+    cwd.mkdir(parents=True, exist_ok=True)
+    name = "omp-fake-work.txt"
+    (cwd / name).write_text(f"fake work {os.getpid()} {time.time_ns()}\n")
+    base = ["git", "-C", str(cwd), "-c", "user.name=t",
+            "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]
+    subprocess.run([*base, "add", "--", name], check=True,
+                   capture_output=True, text=True)
+    subprocess.run([*base, "commit", "-m", "fake omp work", "--", name],
+                   check=True, capture_output=True, text=True)
+    print("SESSION: fake-1")
+    print("STATUS:  ok")
+    print("COST:    $0.0300")
+    print("LOG:     /dev/null")
+    print("---- worker final message ----")
+    print("## RESULT: done")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

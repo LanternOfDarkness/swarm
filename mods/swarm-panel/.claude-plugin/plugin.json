@@ -1,0 +1,6 @@
+{
+  "name": "swarm-panel",
+  "version": "0.1.0",
+  "description": "Side panel showing the swarm board, plus /clean-pm to hand off and clear the PM session.",
+  "types": "./types/index.d.ts"
+}

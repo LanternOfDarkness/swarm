@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Fake `claude` for the swarm tests: writes/commits a plan or prints a verdict."""
+
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+PLAN = "docs/plans/0007-fake.md"
+
+
+def _value(argv, flag):
+    if flag in argv:
+        index = argv.index(flag)
+        if index + 1 < len(argv):
+            return argv[index + 1]
+    return None
+
+
+def _role(argv):
+    if _value(argv, "--agent") == "swarm-architect":
+        return "architect"
+    prompt = _value(argv, "-p") or ""
+    if prompt.startswith("/review-plan"):
+        return "reviewer"
+    if prompt.startswith("/verify-review"):
+        return "verifier"
+    return "unknown"
+
+
+def _git(cwd, *args):
+    subprocess.run(
+        ["git", "-C", str(cwd), "-c", "user.name=t", "-c", "user.email=t@example.com",
+         "-c", "commit.gpgsign=false", *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def main():
+    argv = sys.argv[1:]
+    mode = os.environ.get("FAKE_CLAUDE_MODE", "")
+    if mode == "limit":
+        result = "Claude usage limit reached"
+        print(json.dumps({
+            "result": result,
+            "is_error": True,
+            "total_cost_usd": 0.0,
+            "session_id": "s",
+        }))
+        return 0
+
+    kind = _role(argv)
+    if kind == "architect":
+        cwd = Path.cwd()
+        plan = cwd / PLAN
+        plan.parent.mkdir(parents=True, exist_ok=True)
+        plan.write_text(
+            "# 0007 — Fake plan\n\n## Goal\n\nFake.\n"
+            f"\n<!-- {os.getpid()} {time.time_ns()} -->\n"
+        )
+        _git(cwd, "add", "--", PLAN)
+        _git(cwd, "commit", "-m", "0007: plan Fake plan", "--", PLAN)
+        result = f"Wrote the plan.\nPLAN: {PLAN}\nREF: 0007\nTITLE: Fake plan"
+    elif kind == "reviewer":
+        verdict = "REVISE" if mode == "revise" else "APPROVE"
+        result = f"Review complete.\nRULINGS: none\nVERDICT: {verdict}"
+    elif kind == "verifier":
+        if mode == "fix":
+            result = (
+                "Verification failed.\n\n## FIX LIST\n\n"
+                "1. app.py:1 expected ok, got bad\n\nVERDICT: FIX"
+            )
+        else:
+            result = "Verification passed.\nVERDICT: PASS"
+    else:
+        print(json.dumps({
+            "result": f"fake claude: unknown role {argv!r}",
+            "is_error": True,
+            "total_cost_usd": 0.0,
+            "session_id": "s",
+        }))
+        return 0
+
+    print(json.dumps({
+        "result": result,
+        "is_error": False,
+        "total_cost_usd": 0.1,
+        "session_id": "s",
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
